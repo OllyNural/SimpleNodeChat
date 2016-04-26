@@ -4,6 +4,7 @@ var fs = require("fs")
 var express = require('express');
 var path = require('path');
 var app = express();
+var moment = require('moment');
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
@@ -11,7 +12,8 @@ app.use(function(req, res, next) {
   next();
 });
 
-var listOfStrings = ['Apples', 'Oranges'];
+// These are barred words. If you say any of these your message won't go through and the message console.logged.
+var listOfStrings = ['Apples', 'Oranges', 'illegal'];
 
 app.use(express.static(__dirname + '/static'));
 
@@ -22,24 +24,20 @@ app.get('/', function(req, res) {
 var server = ws.createServer(function (connection) {
 	connection.nickname = null
 	connection.on("text", function (str) {
+
+		var currentTime = new Date();
+		currentTime = moment(currentTime).format("HH:mm:ss");
+
 		// Check if name or message
 		if (connection.nickname === null) {
 			connection.nickname = str
-			broadcast(str+" entered")
+			broadcast("["+currentTime+"] [" + str + "] entered")
 		} else {
-			var wordIsSafe = true;
-			// Check if string contains any of the barred words
-			for (i = 0; i < listOfStrings.length; i++) {
-				if (str.indexOf(listOfStrings[i]) > -1) {
-					console.log("BARRED Word");
-					wordIsSafe = false;
-					break;
-				}
-			}
-			if (wordIsSafe) {
-				broadcast("["+connection.nickname+"] "+str)
+			var doesWordContainBarred = checkIfArrayContainsString(str, listOfStrings);
+			if (!doesWordContainBarred) {
+				broadcast("["+currentTime+"] [" + connection.nickname + "] : " + str)
 			} else {
-				alertBarredWord(connection.nickname, str);
+				alertBarredWord(connection.nickname, str, currentTime);
 			}
 		}
 	})
@@ -49,8 +47,18 @@ var server = ws.createServer(function (connection) {
 })
 server.listen(8081)
 
-function alertBarredWord(username, str) {
-	console.log("Logging [" + username + "] saying [" + str + "]");
+function checkIfArrayContainsString(str, array) {
+	// Check if string contains any of the barred words
+	for (i = 0; i < listOfStrings.length; i++) {
+		if (str.indexOf(listOfStrings[i]) > -1) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function alertBarredWord(username, str, currentTime) {
+	console.log("ALERT: At [" + currentTime + "] Logging [" + username + "] saying [" + str + "]");
 }
 
 function broadcast(str) {
